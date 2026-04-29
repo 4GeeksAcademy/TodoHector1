@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 const Home = () => {
     const [tarea, setTarea] = useState("");
     const [lista, setLista] = useState([]);
-    const [cargando, setCargando] = useState(true); 
+    const [cargando, setCargando] = useState(true);
+    const [editandoId, setEditandoId] = useState(null);
+    const [valorEditado, setValorEditado] = useState(""); 
 
 
 	const postEnv ='https://playground.4geeks.com/todo/todos/hector';
 	const delte = 'https://playground.4geeks.com/todo/todos/';
-
     const baseUrl = 'https://playground.4geeks.com/todo/todos/hector';
 
     
@@ -31,6 +32,25 @@ const Home = () => {
         obtenerTareas();
     }, []);
 
+
+    const guardarCambios = async (id) => {
+    try {
+        const res = await fetch(`${delte}${id}`, {
+            method: 'PUT',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ label: valorEditado, is_done: false })
+        });
+
+        if (res.ok) {
+            const tareaActualizada = await res.json();
+            setLista(lista.map(item => item.id === id ? tareaActualizada : item));
+            setEditandoId(null);
+        }
+        
+    } catch (error) {
+        console.log("Error al editar:", error);
+    }
+};
 
     const agregarTarea = async (e) => {
 
@@ -70,7 +90,7 @@ const Home = () => {
 
         if (deltet.ok) {
             console.log('Tarea eliminada en servidor');
-            
+
             const nuevaLista = lista.filter((item) => item.id !== idAEliminar);
             setLista(nuevaLista);
         } else {
@@ -79,8 +99,51 @@ const Home = () => {
     } catch (err) {
         console.log('Hay un error', err);
     }
-    
-};
+}
+
+    const editarTarea = async (id, nuevoTexto) => {
+
+    try {
+        const res = await fetch(`${delte}${id}`, {
+            method: 'PUT',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                label: nuevoTexto,
+                is_done: false
+            })
+        });
+
+        if (res.ok) {
+            const tareaEditada = await res.json();
+            setLista(lista.map(item => item.id === id ? tareaEditada : item));
+        }
+    } catch (error) {
+        console.log("Error al editar:", error);
+    }
+    }
+
+    const marcarCompletada = async (tarea) => {
+        try {
+            const res = await fetch(`${delte}${tarea.id}`, {
+                method: 'PUT',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ 
+                    label: tarea.label, 
+                    is_done: !tarea.is_done
+                })
+            });
+
+            if (res.ok) {
+                const tareaActualizada = await res.json();
+                // Actualizamos la lista local
+                setLista(lista.map(item => item.id === tarea.id ? tareaActualizada : item));
+            }
+        } catch (error) {
+            console.log("Error al actualizar estado:", error);
+        }
+    };
+        
+
 
     return (
         <div className="container mt-5" style={{ maxWidth: '400px' }}>
@@ -119,22 +182,38 @@ const Home = () => {
                         <button className="btn btn-primary" type="submit">Añadir</button>
                     </form>
 
-                    <ul className="list-group">
-                        {lista.map((item, index) => (
-                            <li key={item.id || index} className="list-group-item d-flex justify-content-between align-items-center item-tarea">
+            <ul className="list-group">
+                    {lista.map((item) => (
+                        <li key={item.id} className="list-group-item d-flex justify-content-between align-items-center item-tarea">
+                            
+                          
+                            <span style={{ textDecoration: item.is_done ? 'line-through' : 'none' }}>
                                 {item.label}
+                            </span>
+
+                            <div>
+                                
                                 <button 
-                                    className="btn btn-danger btn-sm btn-oculto"
+                                    className={`btn btn-sm me-2 ${item.is_done ? 'btn-success' : 'btn-outline-secondary'}`}
+                                    onClick={() => marcarCompletada(item)}
+                                >
+                                    {item.is_done ? '✓' : '○'} 
+                                </button>
+
+                                {/* BOTÓN DE BORRAR (X) */}
+                                <button 
+                                    className="btn btn-danger btn-sm" 
                                     onClick={() => eliminarTarea(item.id)}
                                 >
                                     X
                                 </button>
-                            </li>
-                        ))}
-                    </ul>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
                     
-                    {lista.length === 0 && <p className="text-center mt-3">No hay tareas pendientes.</p>}
-                </>
+                {lista.length === 0 && <p className="text-center mt-3">No hay tareas pendientes.</p>}
+            </>
             )}
         </div>
     );
