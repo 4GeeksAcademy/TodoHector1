@@ -4,219 +4,152 @@ const Home = () => {
     const [tarea, setTarea] = useState("");
     const [lista, setLista] = useState([]);
     const [cargando, setCargando] = useState(true);
-    const [editandoId, setEditandoId] = useState(null);
-    const [valorEditado, setValorEditado] = useState(""); 
+    const [editandoId, setEditandoId] = useState(null); // ID de la tarea que se está editando
+    const [valorEditado, setValorEditado] = useState("");
 
+  /*   const API_URL = 'https://playground.4geeks.com/todo/todos/hector'; */
+  const API_URL = 'https://playground.4geeks.com/todo/users/hector1';
 
-	const postEnv ='https://playground.4geeks.com/todo/todos/hector';
-	const delte = 'https://playground.4geeks.com/todo/todos/';
-    const baseUrl = 'https://playground.4geeks.com/todo/todos/hector';
-
-    
-    useEffect(() => {
-        const obtenerTareas = async () => {
-            try {
-                const res = await fetch(baseUrl);
-                if (res.ok) {
-                    const data = await res.json();
-                    
-                    setLista(data.todos || []); 
-                }
-
-                setCargando(false);
-            } catch (error) {
-                console.log("Error cargando tareas:", error);
-                setCargando(false);
+  useEffect(() => {
+    const inicializarUsuario = async () => {
+        setCargando(true);
+        try {
+            // 1. Intentamos crear el usuario
+            const resUser = await fetch('https://playground.4geeks.com/todo/users/hector1', {
+                method: 'POST',
+                headers: { "Content-Type": "application/json" }
+            });
+            
+            // Si es 400, no pasa nada, el usuario ya existe. 
+            // Si es otro error, sí lanzamos alerta.
+            if (resUser.status !== 201 && resUser.status !== 400) {
+                console.error("Error al crear usuario");
             }
-        };
-        obtenerTareas();
-    }, []);
+
+            // 2. Ahora cargamos las tareas
+            const resTodos = await fetch('https://playground.4geeks.com/todo/todos/hector1');
+            
+            if (resTodos.ok) {
+                const data = await resTodos.json();
+                setLista(data.todos || []);
+            }
+        } catch (error) {
+            console.error("Error:", error);
+        } finally {
+            setCargando(false);
+        }
+    };
+    inicializarUsuario();
+}, []);
 
 
-    const guardarCambios = async (id) => {
+    const agregarTarea = async (e) => {
+    e.preventDefault();
+    console.log("Intentando agregar:", tarea); // 1. Ver si entra al evento
+
+    if (tarea.trim() === "") return;
+
     try {
-        const res = await fetch(`${delte}${id}`, {
-            method: 'PUT',
+        const res = await fetch('https://playground.4geeks.com/todo/todos/hector1', {
+            method: 'POST',
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ label: valorEditado, is_done: false })
+            body: JSON.stringify({ label: tarea, is_done: false })
         });
 
+        const data = await res.json();
+        console.log("Respuesta del servidor:", data); // 2. Ver qué dice el servidor exactamente
+
         if (res.ok) {
-            const tareaActualizada = await res.json();
-            setLista(lista.map(item => item.id === id ? tareaActualizada : item));
-            setEditandoId(null);
+            // Actualizar localmente sin volver a llamar a la API para descartar fallos de red
+            setLista([...lista, data]); 
+            setTarea("");
         }
-        
-    } catch (error) {
-        console.log("Error al editar:", error);
+    } catch (error) { 
+        console.error('Error crítico:', error); 
     }
 };
 
-    const agregarTarea = async (e) => {
-
-		e.preventDefault();
-		if (tarea.trim() === "") return; 
-
+    const eliminarTarea = async (idAEliminar) => {
         try {
-
-			console.log('Agregando Tarea');
-			const agre = await fetch (postEnv, {
-			method: 'POST',
-			headers: {
-                "Content-Type": "application/json"
-            },
-			body: JSON.stringify({
-                label: tarea,
-                is_done: false
-            })
-			});
-			const nuevaTarea = await agre.json();
-			setLista([...lista, nuevaTarea]); 
-			setTarea("");
- 
-		}catch{
-			console.log('Hay un error');
-		}
-		console.log('se ha recibido');
+            const res = await fetch(`https://playground.4geeks.com/todo/todos/${idAEliminar}`, { method: 'DELETE' });
+            if (res.ok) {
+                setLista(lista.filter((item) => item.id !== idAEliminar));
+            }
+        } catch (err) { console.log('Error al borrar', err); }
     };
 
-    const eliminarTarea = async (idAEliminar) => {
 
+    const guardarEdicion = async (id, nuevoLabel) => {
     try {
-        const deltet = await fetch(`${delte}${idAEliminar}`, {
-            method: 'DELETE'
-        });
-
-
-        if (deltet.ok) {
-            console.log('Tarea eliminada en servidor');
-
-            const nuevaLista = lista.filter((item) => item.id !== idAEliminar);
-            setLista(nuevaLista);
-        } else {
-            console.log('El servidor no pudo borrar la tarea');
-        }
-    } catch (err) {
-        console.log('Hay un error', err);
-    }
-}
-
-    const editarTarea = async (id, nuevoTexto) => {
-
-    try {
-        const res = await fetch(`${delte}${id}`, {
-            method: 'PUT',
+        const res = await fetch(`https://playground.4geeks.com/todo/todos/${id}`, {
+            method: 'PUT', // El método para actualizar es PUT
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                label: nuevoTexto,
-                is_done: false
-            })
+            body: JSON.stringify({ label: nuevoLabel, is_done: false })
         });
 
         if (res.ok) {
-            const tareaEditada = await res.json();
-            setLista(lista.map(item => item.id === id ? tareaEditada : item));
+            // Actualizamos la lista localmente
+            setLista(lista.map(item => item.id === id ? { ...item, label: nuevoLabel } : item));
+            setEditandoId(null); // Salimos del modo edición
         }
     } catch (error) {
-        console.log("Error al editar:", error);
+        console.error("Error al actualizar:", error);
     }
+};
+
+const eliminarTodo = async () => {
+    // La API de 4Geeks requiere borrar una por una o borrar el usuario.
+    // Lo más sencillo es un bucle que elimine cada ID de la lista actual.
+    for (const item of lista) {
+        await fetch(`https://playground.4geeks.com/todo/todos/${item.id}`, { method: 'DELETE' });
     }
-
-    const marcarCompletada = async (tarea) => {
-        try {
-            const res = await fetch(`${delte}${tarea.id}`, {
-                method: 'PUT',
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ 
-                    label: tarea.label, 
-                    is_done: !tarea.is_done
-                })
-            });
-
-            if (res.ok) {
-                const tareaActualizada = await res.json();
-                // Actualizamos la lista local
-                setLista(lista.map(item => item.id === tarea.id ? tareaActualizada : item));
-            }
-        } catch (error) {
-            console.log("Error al actualizar estado:", error);
-        }
-    };
-        
-
+    setLista([]);
+};
 
     return (
         <div className="container mt-5" style={{ maxWidth: '400px' }}>
-            <style>{`
-                .item-tarea .btn-oculto {
-                    opacity: 0;
-                    transition: opacity 0.2s;
-                }
-                .item-tarea:hover .btn-oculto {
-                    opacity: 1;
-                }
-            `}</style>
-
             <h2 className="text-center">Mis Tareas</h2>
+            
+            {/* Formulario para añadir */}
+            <form onSubmit={agregarTarea} className="d-flex mb-3">
+                <input 
+                    className="form-control"
+                    value={tarea}
+                    onChange={(e) => setTarea(e.target.value)}
+                    placeholder="Añadir tarea..."
+                />
+                <button className="btn btn-primary ms-2" type="submit">Añadir</button>
+            </form>
 
-            {cargando ? (
-                <div className="progress mb-3">
-                    <div 
-                        className="progress-bar progress-bar-striped progress-bar-animated" 
-                        role="progressbar" 
-                        style={{ width: '100%' }}
-                    >
-                        Cargando tareas...
-                    </div>
-                </div>
-            ) : (
-                <>
-                    <form onSubmit={agregarTarea} className="d-flex mb-3">
-                        <input 
-                            type="text" 
-                            className="form-control me-2"
-                            placeholder="Escribe una tarea..."
-                            value={tarea}
-                            onChange={(e) => setTarea(e.target.value)}
-                        />
-                        <button className="btn btn-primary" type="submit">Añadir</button>
-                    </form>
-
+            {/* Lista de tareas */}
             <ul className="list-group">
-                    {lista.map((item) => (
-                        <li key={item.id} className="list-group-item d-flex justify-content-between align-items-center item-tarea">
-                            
-                          
-                            <span style={{ textDecoration: item.is_done ? 'line-through' : 'none' }}>
+                {lista.map((item) => (
+                    <li key={item.id} className="list-group-item d-flex justify-content-between align-items-center">
+                        {editandoId === item.id ? (
+                            <input 
+                                className="form-control"
+                                value={valorEditado}
+                                onChange={(e) => setValorEditado(e.target.value)}
+                                onBlur={() => guardarEdicion(item.id, valorEditado)}
+                                autoFocus
+                            />
+                        ) : (
+                            <span onClick={() => { setEditandoId(item.id); setValorEditado(item.label); }}>
                                 {item.label}
                             </span>
+                        )}
+                        <div>
+                            <button className="btn btn-warning btn-sm me-2" onClick={() => { setEditandoId(item.id); setValorEditado(item.label); }}>Editar</button>
+                            <button className="btn btn-danger btn-sm" onClick={() => eliminarTarea(item.id)}>X</button>
+                        </div>
+                    </li>
+                ))}
+            </ul>
 
-                            <div>
-                                
-                                <button 
-                                    className={`btn btn-sm me-2 ${item.is_done ? 'btn-success' : 'btn-outline-secondary'}`}
-                                    onClick={() => marcarCompletada(item)}
-                                >
-                                    {item.is_done ? '✓' : '○'} 
-                                </button>
-
-                                {/* BOTÓN DE BORRAR (X) */}
-                                <button 
-                                    className="btn btn-danger btn-sm" 
-                                    onClick={() => eliminarTarea(item.id)}
-                                >
-                                    X
-                                </button>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-                    
-                {lista.length === 0 && <p className="text-center mt-3">No hay tareas pendientes.</p>}
-            </>
-            )}
+            {/* Botón borrar todo */}
+            <button className="btn btn-outline-danger mt-3 w-100" onClick={eliminarTodo}>Borrar todas las tareas</button>
         </div>
     );
-}
+};
 
 export default Home;
